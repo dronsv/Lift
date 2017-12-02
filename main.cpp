@@ -8,11 +8,13 @@
 #include "lift.hpp"
 
 void printUsage() {
-    BOOST_LOG_TRIVIAL( info ) << "this program needs 4 parameters:\n"
-                             << "topLevel: integer\n"
-                             << "levelHeight (m): double\n"
-                             << "Lift speed(m/s): double\n"
-                             << "door open time(s): double\n";
+    BOOST_LOG_TRIVIAL( info ) << "This program needs 4 parameters:\n"
+                              << "topLevel: integer\n"
+                              << "levelHeight (m): double\n"
+                              << "Lift speed(m/s): double\n"
+                              << "door open time(s): double\n"
+                              << "example Lift 10 3.0 2.0 7.0\n"
+                              << "decimal delimiter depends on system settings\n";
 
     BOOST_LOG_TRIVIAL( info ) << "A-Z: buttons in lift (A - first level)\n";
     BOOST_LOG_TRIVIAL( info ) << "a-z: buttons outside lift (A - first level)\n";
@@ -30,6 +32,7 @@ int main(int argc, char *argv[]) {
 
     if (argc < 5) {
         BOOST_LOG_TRIVIAL(error) << "error in parse parameters: ";
+        printUsage();
         return -1;
     }
 
