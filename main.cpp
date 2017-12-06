@@ -1,9 +1,4 @@
 #include <iostream>
-#include <valarray>
-#include <thread>
-#include <atomic>
-#include <mutex>
-#include <condition_variable>
 #include <csignal>
 #include "lift.hpp"
 
@@ -42,9 +37,17 @@ int main(int argc, char *argv[]) {
 
     try {
         maxLevel = std::stoi(argv[1]);
+        if (maxLevel <5 || maxLevel >20)
+            throw "level range [1..5]";
         height = std::stod(argv[2]);
+        if ( height <= 0)
+            throw "height must be >=0";
         speed = std::stod(argv[3]);
+        if ( speed <= 0)
+            throw "speed must be >=0";
         openTime = std::stod(argv[4]);
+        if ( openTime <= 0)
+            throw "openTime must be >=0";
     }
     catch (std::exception &exception) {
         BOOST_LOG_TRIVIAL(error) << "error in parse parameters: " << exception.what();

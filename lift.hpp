@@ -38,12 +38,13 @@ public:
 
     bool isDoorOpen();
 
-
-private:
-
+///Non copy
     void operator=(const Lift &) = delete;
 
     Lift(const Lift &) = delete;
+
+private:
+
 
     void setDoorOpen(bool open);
 
@@ -86,14 +87,16 @@ private:
     unsigned int _levelPassTimeMilliseconds;///< time to pass one level state
     unsigned int _doorOpensTimeMilliseconds;///< time of open door state
 
+
+    int getClosest(int direction);
+
+    int getClosestDown();
+
+    int getClosestUp();
+
+
     struct State {
         explicit State(int levelsCount, int levelIndex);
-
-        int getClosest(int direction) const;
-
-        int getClosestDown() const;
-
-        int getClosestUp() const;
 
         std::valarray<bool> _requests;
         int _currentIndex = 0;
@@ -101,15 +104,15 @@ private:
         bool _doorsOpen = false;
     };
 
-    State _state;///\variable representing current lift state
+    State _state;///\brief variable representing current lift state
 
 
-    std::mutex _newCommandMutex;///\brief Mutex for new command condition variable
-    std::condition_variable _newCommandCondition;///\brief used for wake up waiting state
+    std::mutex _requestsMutex;///< \brief Mutex for new command condition variable
+    std::condition_variable _requestCondition;///< \brief used for wake up waiting state
 
-    std::mutex _cabinEventMutex;///< mutex for _cabinEventCondition
-    std::condition_variable _cabinEventCondition;///< used for close door instantly after cabin event
-    bool _cabinControl = false;///< cabinEventCondition control flag
+    std::mutex _cabinEventMutex;///< \brief mutex for _cabinEventCondition
+    std::condition_variable _cabinEventCondition;///< \brief used for close door instantly after cabin event
+    bool _cabinControl = false;///< \brief cabinEventCondition control flag
 
     std::thread _thread;///< main lift thread
     bool _running = false;

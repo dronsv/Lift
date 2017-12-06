@@ -7,6 +7,9 @@
 
 #define NO_VALUE 99999
 
+
+#define LOCK( mutex ) std::lock_guard<decltype(mutex)> locker(mutex);
+
 /*!
  * thread sleep for time in milliseconds
  * @param milliSeconds - time to sleep
@@ -43,7 +46,7 @@ Lift::Lift(int firstLevel, int lastLevel, double height, double speed, double do
 Lift::~Lift() {
     _running = false;
     if (_thread.joinable()) {
-        _newCommandCondition.notify_all();
+        _requestCondition.notify_all();
         _thread.join();
     }
 }
@@ -61,12 +64,15 @@ void Lift::processEvent(int level, bool fromCabin) {
 
     if (fromCabin) {
         BOOST_LOG_TRIVIAL(info) << "request from cabin to level: " << level;
+        {
+            LOCK(_cabinEventMutex)
+            _cabinControl = true;
+        }
         _cabinEventCondition.notify_all();
-        _cabinControl = true;
     }
     else
         BOOST_LOG_TRIVIAL(info) << "request from outside to level: " << level;
-    _newCommandCondition.notify_one();
+    _requestCondition.notify_one();
 }
 
 int Lift::getDirection() {
@@ -117,6 +123,7 @@ bool Lift::setLevelRequest(int level, bool state) {
 }
 
 void Lift::setIndexRequest(int index, bool state) {
+    LOCK(_requestsMutex);
     _state._requests[index] = state;
 }
 
@@ -179,7 +186,6 @@ void Lift::openDoor() {
  * Move Up state function
  */
 void Lift::moveUp() {
-    _state._direction = MOVE_UP;
 
     if (checkNeedDoorOpen()) {
         BIND_FUNC(openDoor);
@@ -187,14 +193,14 @@ void Lift::moveUp() {
     }
 
 
-    if (_state.getClosest(MOVE_UP) != NO_VALUE) {
+    if (getClosest(MOVE_UP) != NO_VALUE) {
         BOOST_LOG_TRIVIAL(info) << "MoveUp at level: " << getLevel();
         sleepFor(_levelPassTimeMilliseconds);
         setCurrentIndex(getCurrentIndex() + 1);
         return;
     }
 
-    if (_state.getClosest(MOVE_DOWN) != NO_VALUE) {
+    if (getClosest(MOVE_DOWN) != NO_VALUE) {
         BIND_FUNC(moveDown);
         return;
     }
@@ -213,14 +219,14 @@ void Lift::moveDown() {
         return;
     }
 
-    if (_state.getClosest(MOVE_DOWN) != NO_VALUE) {
+    if (getClosest(MOVE_DOWN) != NO_VALUE) {
         setCurrentIndex(getCurrentIndex() - 1);
         BOOST_LOG_TRIVIAL(info) << "MoveDown at level: " << getLevel();
         sleepFor(_levelPassTimeMilliseconds);
         return;
     }
 
-    if (_state.getClosest(MOVE_UP) != NO_VALUE) {
+    if (getClosest(MOVE_UP) != NO_VALUE) {
         BIND_FUNC(moveUp);
         return;
     }
@@ -234,9 +240,8 @@ void Lift::moveDown() {
 void Lift::wait() {
     setDirection(WAITING);
     while (_running) {
-        std::unique_lock<std::mutex> locker(_newCommandMutex);
-
-        auto closest = _state.getClosest(WAITING);
+        std::unique_lock<std::mutex> locker(_requestsMutex);
+        auto closest = getClosest(WAITING);
         if (closest != NO_VALUE) {
             if (closest > getCurrentIndex()) {
                 BIND_FUNC(moveUp);
@@ -246,7 +251,7 @@ void Lift::wait() {
                 return;
             }
         }
-        _newCommandCondition.wait_for(locker, std::chrono::seconds(1));
+        _requestCondition.wait_for(locker, std::chrono::seconds(1));
     }
 }
 
@@ -276,7 +281,7 @@ Lift::State::State(int levelsCount, int levelIndex) :
 /*
  * Get nearest request index with given direction
  */
-int Lift::State::getClosest(int direction) const {
+int Lift::getClosest(int direction) {
     if (direction == MOVE_UP) {
         return getClosestUp();
     } else if (direction == MOVE_DOWN) {
@@ -284,7 +289,7 @@ int Lift::State::getClosest(int direction) const {
     } else {
         auto down = getClosestDown();
         auto up = getClosestUp();
-        if (abs(down - _currentIndex) < abs(up - _currentIndex))
+        if (abs(down - _state._currentIndex) < abs(up - _state._currentIndex))
             return down;
         else
             return up;
@@ -295,9 +300,9 @@ int Lift::State::getClosest(int direction) const {
 /*
  * Get nearest request index with given direction down
  */
-int Lift::State::getClosestDown() const {
-    for (int indMin = _currentIndex; indMin >= 0; --indMin) {
-        if (_requests[indMin])
+int Lift::getClosestDown(){
+    for (int indMin = _state._currentIndex; indMin >= 0; --indMin) {
+        if (_state._requests[indMin])
             return indMin;
     }
     return NO_VALUE;
@@ -306,14 +311,15 @@ int Lift::State::getClosestDown() const {
 /*
  * Get nearest request index with given direction up
  */
-int Lift::State::getClosestUp() const {
-    size_t requestSize = _requests.size();
-    for (int indMax = _currentIndex; indMax < requestSize; ++indMax) {
-        if (_requests[indMax])
+int Lift::getClosestUp(){
+    auto requestSize = _state._requests.size();
+    for (int indMax = _state._currentIndex; indMax < requestSize; ++indMax) {
+        if (_state._requests[indMax])
             return indMax;
     }
     return NO_VALUE;
 }
 
+#undef LOCK
 #undef NO_VALUE
 #undef BIND_FUNC
