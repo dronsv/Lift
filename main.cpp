@@ -19,40 +19,43 @@ void printUsage() {
 
 void handler(int signal) {
     BOOST_LOG_TRIVIAL( info ) << "signal received: " << signal;
-    exit(-2);
+    exit(2);
 };
 
 int main(int argc, char *argv[]) {
     BOOST_LOG_TRIVIAL(info) << "program started";
 
-    if (argc < 5) {
-        BOOST_LOG_TRIVIAL(error) << "error in parse parameters: ";
-        printUsage();
-        return -1;
-    }
 
     int maxLevel(10);
     double height(3), speed(2), openTime(5);
 
 
+    printUsage();
+
     try {
+        if (argc < 5) {
+            throw std::runtime_error("parameters count less then required ");
+        }
+
         maxLevel = std::stoi(argv[1]);
         if (maxLevel <5 || maxLevel >20)
-            throw "level range [1..5]";
+            throw std::runtime_error("level must be range [5..20]");
+
         height = std::stod(argv[2]);
         if ( height <= 0)
-            throw "height must be >=0";
+            throw std::runtime_error("height must be >=0");
+
         speed = std::stod(argv[3]);
         if ( speed <= 0)
-            throw "speed must be >=0";
+            throw std::runtime_error("speed must be >=0");
+
         openTime = std::stod(argv[4]);
         if ( openTime <= 0)
-            throw "openTime must be >=0";
+            throw std::runtime_error("openTime must be >=0");
     }
     catch (std::exception &exception) {
         BOOST_LOG_TRIVIAL(error) << "error in parse parameters: " << exception.what();
-        printUsage();
-        exit(-1);
+        exit(1);
     }
 
     Lift lift(1, maxLevel, height, speed, openTime);
